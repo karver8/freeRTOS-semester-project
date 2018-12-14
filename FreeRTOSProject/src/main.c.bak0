@@ -1,0 +1,157 @@
+/**
+ * \file
+ *
+ * \brief Empty user application template
+ *
+ */
+
+/**
+ * \mainpage User Application template doxygen documentation
+ *
+ * \par Empty user application template
+ *
+ * Bare minimum empty user application template
+ *
+ * \par Content
+ *
+ * -# Include the ASF header files (through asf.h)
+ * -# Minimal main function that starts with a call to system_init()
+ * -# "Insert application code here" comment
+ *
+ */
+
+/*
+ * Include header files for all drivers that have been imported from
+ * Atmel Software Framework (ASF).
+ */
+/*
+ * Support and FAQ: visit <a href="https://www.microchip.com/support/">Microchip Support</a>
+ */
+#include <asf.h>
+#include <stdio.h>
+#include <string.h>
+
+#define EDBG_CDC_SERCOM_MUX_SETTING USART_RX_3_TX_2_XCK_3
+#define EDBG_CDC_SERCOM_PINMUX_PAD0 PINMUX_UNUSED
+#define  EDBG_CDC_SERCOM_PINMUX_PAD1 PINMUX_UNUSED
+#define EDBG_CDC_SERCOM_PINMUX_PAD2 PINMUX_PB22D_SERCOM5_PAD2
+#define  EDBG_CDC_SERCOM_PINMUX_PAD3 PINMUX_PB23D_SERCOM5_PAD3
+#define EDBG_CDC_MODULE SERCOM5
+
+#define LIDAR_CDC_SERCOM_MUX_SETTING USART_RX_3_TX_2_XCK_3
+#define LIDAR_CDC_SERCOM_PINMUX_PAD0 PINMUX_UNUSED
+#define  LIDAR_CDC_SERCOM_PINMUX_PAD1 PINMUX_UNUSED
+#define LIDAR_CDC_SERCOM_PINMUX_PAD2 PINMUX_PA10D_SERCOM2_PAD2
+#define  LIDAR_CDC_SERCOM_PINMUX_PAD3 PINMUX_PA11D_SERCOM2_PAD3
+#define LIDAR_CDC_MODULE SERCOM2
+
+
+#define CONF_PWM_MODULE      TCC0
+#define CONF_PWM_CHANNEL     0
+#define CONF_PWM_OUTPUT      0
+#define CONF_PWM_OUT_PIN     PIN_PA08
+#define CONF_PWM_OUT_MUX     PINMUX_PA08E_TCC0_WO0
+
+
+struct usart_module usart_instance;
+struct usart_module usart_instance_lidar;
+struct tcc_module tcc_instance;
+
+static void configure_tcc(void)
+{
+	struct tcc_config config_tcc;
+	tcc_get_config_defaults(&config_tcc, CONF_PWM_MODULE);
+	config_tcc.counter.clock_prescaler = TCC_CLOCK_PRESCALER_DIV1;
+	config_tcc.counter.period = 1000;
+	config_tcc.compare.wave_generation = TCC_WAVE_GENERATION_SINGLE_SLOPE_PWM;
+	config_tcc.compare.match[CONF_PWM_CHANNEL] = 500;
+	config_tcc.pins.enable_wave_out_pin[CONF_PWM_OUTPUT] = true;
+	config_tcc.pins.wave_out_pin[CONF_PWM_OUTPUT]        = CONF_PWM_OUT_PIN;
+	config_tcc.pins.wave_out_pin_mux[CONF_PWM_OUTPUT]    = CONF_PWM_OUT_MUX;
+	tcc_init(&tcc_instance, CONF_PWM_MODULE, &config_tcc);
+	tcc_enable(&tcc_instance);
+}
+
+void configure_usart(void){
+
+	struct usart_config config_usart;
+	usart_get_config_defaults(&config_usart);
+	config_usart.baudrate    = 115200;
+	config_usart.mux_setting = EDBG_CDC_SERCOM_MUX_SETTING;
+	config_usart.pinmux_pad0 = EDBG_CDC_SERCOM_PINMUX_PAD0;
+	config_usart.pinmux_pad1 = EDBG_CDC_SERCOM_PINMUX_PAD1;
+	config_usart.pinmux_pad2 = EDBG_CDC_SERCOM_PINMUX_PAD2;
+	config_usart.pinmux_pad3 = EDBG_CDC_SERCOM_PINMUX_PAD3;
+	//while (usart_init(&usart_instance,EDBG_CDC_MODULE, &config_usart) != STATUS_OK) {
+	//}
+	stdio_serial_init(&usart_instance,EDBG_CDC_MODULE, &config_usart);
+	usart_enable(&usart_instance);
+	}
+	
+void configure_usart_lidar(void){
+
+	struct usart_config config_usart;
+	usart_get_config_defaults(&config_usart);
+	config_usart.baudrate    = 115200;
+	config_usart.mux_setting = LIDAR_CDC_SERCOM_MUX_SETTING;
+	config_usart.pinmux_pad0 = LIDAR_CDC_SERCOM_PINMUX_PAD0;
+	config_usart.pinmux_pad1 = LIDAR_CDC_SERCOM_PINMUX_PAD1;
+	config_usart.pinmux_pad2 = LIDAR_CDC_SERCOM_PINMUX_PAD2;
+	config_usart.pinmux_pad3 = LIDAR_CDC_SERCOM_PINMUX_PAD3;
+	while (usart_init(&usart_instance_lidar,LIDAR_CDC_MODULE, &config_usart) != STATUS_OK) {
+	}
+	
+	
+	usart_enable(&usart_instance_lidar);
+}
+
+int main (void)
+{
+	uint16_t dist;//actual distance measurements of LiDAR
+	uint16_t strength;//signal strength of LiDAR
+	uint8_t check;//save check value
+	int i;
+	uint8_t uart[9];//save data measured by LiDAR
+	const uint8_t HEADER=0x59;//frame header of data package
+	
+	system_init();
+	configure_usart();
+	configure_usart_lidar();
+	configure_tcc();
+	 
+	 
+	uint16_t temp;
+	while (true) {
+		 if (usart_read_wait(&usart_instance_lidar, &temp) == STATUS_OK)
+		 {
+			if(temp==HEADER)
+			{
+				uart[0] = HEADER;
+				while(usart_read_wait(&usart_instance_lidar, &temp) != STATUS_OK){}
+				if(temp==HEADER)
+				{
+					uart[1]=temp;
+					for(i=2;i<9;i++)
+					{
+						while(usart_read_wait(&usart_instance_lidar, &temp) != STATUS_OK){}
+						uart[i]=temp;
+					}
+					check=uart[0]+uart[1]+uart[2]+uart[3]+uart[4]+uart[5]+uart[6]+uart[7];
+					//if(uart[8]!=check)
+					if(uart[8]==check)
+					{
+						dist=uart[3] << 8;//calculate distance value
+						dist+=uart[2];
+						strength=(uint16_t)uart[4] || (uint16_t)uart[5] << 8;//calculate signal strength value
+						//printf("dist = %d \r\nstrength = %d \r\n", &dist, &strength);
+						printf("dist = %d \r\n", dist);
+						tcc_set_compare_value(&tcc_instance,CONF_PWM_CHANNEL, dist - 30);
+					}
+				}
+			
+			}
+		}
+	}	
+}
+
+
