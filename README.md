@@ -9,3 +9,6 @@ To setup Tracealyzer with Atmel, refer to the Tracealyzer user manual and follow
 Found here: https://percepio.com/docs/FreeRTOS/manual/
 
 *Disclaimer: This manual is very vague at times and does not offer all the solutions necessary, a lot of specifics will need to be looked into depending on your system and hardware. Setting Tracealyzer up is not as straightforward as it could be.
+
+# Finished Hardware Design
+![Design](https://drive.google.com/uc?export=view&id=1hmUYtofk3WWrL4B9NU9QUR3OBKZxoxVH)
